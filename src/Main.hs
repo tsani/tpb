@@ -91,11 +91,13 @@ cliRequest
         <>
         command "threads" (
           fullDescInfo $
-            pure (\d -> do
+            pure (\d n -> do
               d' <- maybe (fmap DeviceId $ line device) pure d
-              pure $ inject <$> listThreads d'
+              pure $ inject <$> do
+                filter (matchRecipientName n) <$> listThreads d'
             )
             <*> optional (option (DeviceId <$> raw) (long "device"))
+            <*> optional (option (Name <$> raw) (long "involving"))
         )
       )
     )
@@ -183,3 +185,12 @@ data Error
 
 ePutStrLn :: String -> IO ()
 ePutStrLn = hPutStrLn stderr
+
+-- | Match a name to an sms thread. If there is no name given, always produces
+-- True. Otherwise, returns True if and only if there exists a recipient of the
+-- thread whose casefolded name contains the given name as a substring.
+matchRecipientName :: Maybe Name -> SmsThread -> Bool
+matchRecipientName Nothing = const True
+matchRecipientName (Just (Name (T.toCaseFold -> n)))
+  = any ((n `T.isInfixOf`) . T.toCaseFold . unName . recipientName)
+  . threadRecipients
