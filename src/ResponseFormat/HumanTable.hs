@@ -21,6 +21,7 @@ import qualified Data.Text as T
 import Data.Time.Clock ( diffUTCTime, NominalDiffTime )
 import Data.Time.Format ( defaultTimeLocale, formatTime )
 import Data.Time.LocalTime ( getTimeZone, utcToLocalTime )
+import Lens.Micro
 import qualified Text.PrettyPrint.ANSI.Leijen as P
 
 newtype HumanTable = HumanTable P.Doc
@@ -33,26 +34,27 @@ formatHumanTable
 formatHumanTable
   = smsMessage -| smsThreads -| ok -| devices -| Inexhaustive where
 
-    chronologicalBy f = sortBy (comparing (smsTime . f))
+    chronologicalBy l = sortBy (comparing l)
 
     smsMessage :: [SmsMessage] -> IO HumanTable
-    smsMessage (chronologicalBy id -> groupSms tenMins -> groups) =
-      HumanTable . P.vcat <$> (mapM phi groups) where
-        phi :: SmsGroup -> IO P.Doc
-        phi (SmsGroup msgs) = do
-          let msg = N.head msgs
-          let dir = smsDirection msg
-          t <- niceTime (smsTime msg)
-          pure $
-            P.vsep (
-              P.hang 2
-              . (arrow dir P.<+>)
-              . P.fillSep
-              . map P.text . words . T.unpack
-              . smsBody
-              <$> N.toList msgs
-            )
-            P.<$> "+" P.<+> P.text t P.<$> ""
+    smsMessage
+      (chronologicalBy (^.smsTime) -> groupSms tenMins -> groups) =
+        HumanTable . P.vcat <$> (mapM phi groups) where
+          phi :: SmsGroup -> IO P.Doc
+          phi (SmsGroup msgs) = do
+            let msg = N.head msgs
+            let dir = msg^.smsDirection
+            t <- niceTime (msg^.smsTime)
+            pure $
+              P.vsep (
+                P.hang 2
+                . (arrow dir P.<+>)
+                . P.fillSep
+                . map P.text . words . T.unpack
+                . (^.smsBody)
+                <$> N.toList msgs
+              )
+              P.<$> "+" P.<+> P.text t P.<$> ""
 
     tenMins :: NominalDiffTime
     tenMins = 60 * 10 -- ten minutes
@@ -61,20 +63,24 @@ formatHumanTable
     smsThreads
       = fmap (HumanTable . P.vsep) -- join all the lines
       . mapM phi -- convert the thread to a line of text
-      . chronologicalBy threadLatest -- order by latest message in thread
+      . chronologicalBy (^.threadLatest.smsTime)
+        -- order by latest message in thread
       where
         phi :: SmsThread -> IO P.Doc
-        phi SmsThread{..} = do
+        phi t = do
           -- let SmsThreadId i = threadId
-          let SmsMessage{..} = threadLatest
-          let name = P.text . T.unpack. unName . recipientName
-          let recipientNames = map name . N.toList $ threadRecipients
+          -- let SmsMessage{..} = threadLatest
+          let unpackName = P.text . T.unpack . unName
+          let name = unpackName . (^.recipientName)
+          let recipientNames = map name . N.toList $ t^.threadRecipients
           let rs = P.hcat (P.punctuate ", " recipientNames)
-          let body = P.fillSep . map P.text . words . T.unpack $ smsBody
-          t <- niceTime smsTime
+          let niceBody = P.fillSep . map P.text . words . T.unpack
+          let msg = t^.threadLatest
+          let body = niceBody $ msg^.smsBody
+          time <- niceTime (msg^.smsTime)
           pure $
-            dirName smsDirection P.<+> rs P.</>
-            "on" P.<+> P.text t P.<$>
+            dirName (msg^.smsDirection) P.<+> rs P.</>
+            "on" P.<+> P.text time P.<$>
             P.indent 2 body P.<$>
             ""
 
@@ -105,7 +111,7 @@ newtype SmsGroup
     }
 
 smsGroupDir :: SmsGroup -> SmsDirection
-smsGroupDir = smsDirection . N.head . groupMessages
+smsGroupDir = (^.smsDirection) . N.head . groupMessages
 
 -- | Given a list of SMS ordered chronologically and a maximum time difference,
 -- group the messages.
@@ -121,8 +127,8 @@ groupSms d
     timeframe = N.groupBy1 checkTime
 
     samedir :: [SmsMessage] -> [NonEmpty SmsMessage]
-    samedir = N.groupBy ((==) `on` smsDirection)
+    samedir = N.groupBy ((==) `on` (^.smsDirection))
 
     checkTime
-      (SmsMessage{smsTime=PushbulletTime u1})
-      (SmsMessage{smsTime=PushbulletTime u2}) = diffUTCTime u2 u1 < d
+      (SmsMessage{_smsTime=PushbulletTime u1})
+      (SmsMessage{_smsTime=PushbulletTime u2}) = diffUTCTime u2 u1 < d

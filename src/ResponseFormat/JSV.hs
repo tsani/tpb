@@ -17,6 +17,7 @@ import Network.Pushbullet.Types
 import Data.Aeson ( ToJSON(..), encode, (.=), object, Value(Number) )
 import qualified Data.ByteString.Lazy as LBS
 import Data.Monoid ( (<>) )
+import Lens.Micro
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX ( utcTimeToPOSIXSeconds )
 
@@ -57,41 +58,41 @@ instance ToJSON (Formatted PushbulletTime) where
     d = fromRational (toRational $ utcTimeToPOSIXSeconds t)
 
 instance ToJSON (Formatted SmsMessage) where
-  toJSON (Formatted SmsMessage{..}) = object
+  toJSON (Formatted msg) = object
     [ "direction" .= id @T.Text (
-      case smsDirection of
+      case msg^.smsDirection of
         IncomingSms -> "incoming"
         OutgoingSms -> "outgoing"
       )
-    , "time" .= Formatted smsTime
-    , "body" .= smsBody
-    , "smsId" .= smsId
+    , "time" .= Formatted (msg^.smsTime)
+    , "body" .= (msg^.smsBody)
+    , "smsId" .= (msg^.smsId)
     , "smsType" .= id @T.Text (
-      case smsType of
+      case msg^.smsType of
         SMS -> "sms"
         MMS -> "mms"
       )
     ]
 
 instance ToJSON (Formatted SmsThread) where
-  toJSON (Formatted SmsThread{..}) = object
-    [ "id" .= threadId
-    , "recipients" .= (Formatted <$> threadRecipients)
-    , "latest" .= Formatted threadLatest
+  toJSON (Formatted t) = object
+    [ "id" .= (t^.threadId)
+    , "recipients" .= (Formatted <$> t^.threadRecipients)
+    , "latest" .= Formatted (t^.threadLatest)
     ]
 
 instance ToJSON (Formatted SmsThreadRecipient) where
-  toJSON (Formatted SmsThreadRecipient{..}) = object
-    [ "name" .= recipientName
-    , "number" .= recipientNumber
+  toJSON (Formatted r) = object
+    [ "name" .= (r^.recipientName)
+    , "number" .= (r^.recipientNumber)
     ]
 
 instance ToJSON (Formatted (Device 'Existing)) where
-  toJSON (Formatted Device{..}) = object
-    [ "id" .= deviceId
-    , "active" .= deviceActive
-    , "name" .= deviceNickname
-    , "hasSms" .= deviceHasSms
-    , "manufacturer" .= deviceManufacturer
-    , "model" .= deviceModel
+  toJSON (Formatted d) = object
+    [ "id" .= (d^.deviceId)
+    , "active" .= (d^.deviceActive)
+    , "name" .= (d^.deviceNickname)
+    , "hasSms" .= (d^.deviceHasSms)
+    , "manufacturer" .= (d^.deviceManufacturer)
+    , "model" .= (d^.deviceModel)
     ]

@@ -53,7 +53,12 @@ data Elem :: k -> [k] -> Type where
 class Inject (t :: Type) (ts :: [Type]) where
   inject :: t -> Sum 'NonEmptySum ts
 
-instance TypeError ('Text "cannot inject into empty list")
+instance
+  TypeError (
+    'Text "cannot inject " ':<>:
+    'ShowType t ':<>:
+    'Text " into empty list."
+  )
   => Inject t '[] where
   inject = error "inject is impossible"
 

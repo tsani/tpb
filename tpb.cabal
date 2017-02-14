@@ -32,9 +32,10 @@ executable tpb
     filepath,
     http-client,
     http-client-tls >=0.3 && <0.4,
+    microlens >=0.4 && <0.5,
     optparse-applicative >=0.13 && <0.14,
     text,
     time >=1.6 && <1.7,
     servant,
     servant-client,
-    servant-pushbullet-client
+    servant-pushbullet-client >=0.0.3.1 && <0.1

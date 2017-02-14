@@ -29,13 +29,15 @@ import Control.Monad.Free
 import Data.Bifunctor ( first )
 import Data.ByteString ( readFile )
 import qualified Data.ByteString as BS
+import Data.List.NonEmpty ( toList )
 import Data.Monoid ( (<>) )
 import qualified Data.Text as T
 import Data.Text.Encoding ( decodeUtf8 )
+import Lens.Micro
 import Network.HTTP.Client ( newManager )
 import Network.HTTP.Client.TLS ( tlsManagerSettings )
-import Prelude hiding ( readFile )
 import Options.Applicative
+import Prelude hiding ( readFile )
 import Servant.Client
 import System.Exit ( exitFailure )
 import System.IO ( stderr, hPutStrLn )
@@ -81,7 +83,7 @@ cliRequest
             pure (\d n m -> do
               d' <- maybe (fmap DeviceId $ line device) pure d
               pure $ inject <$> do
-                User {userId = u} <- me
+                u <- me <&> (^.userId)
                 sendSms u d' n m
             )
             <*> optional (option (DeviceId <$> raw) (long "device"))
@@ -94,7 +96,9 @@ cliRequest
             pure (\d n -> do
               d' <- maybe (fmap DeviceId $ line device) pure d
               pure $ inject <$> do
-                filter (matchRecipientName n) <$> listThreads d'
+                threads <- listThreads d'
+                let match = maybe (const True) matchRecipientName n
+                pure (filter match threads)
             )
             <*> optional (option (DeviceId <$> raw) (long "device"))
             <*> optional (option (Name <$> raw) (long "involving"))
@@ -189,8 +193,7 @@ ePutStrLn = hPutStrLn stderr
 -- | Match a name to an sms thread. If there is no name given, always produces
 -- True. Otherwise, returns True if and only if there exists a recipient of the
 -- thread whose casefolded name contains the given name as a substring.
-matchRecipientName :: Maybe Name -> SmsThread -> Bool
-matchRecipientName Nothing = const True
-matchRecipientName (Just (Name (T.toCaseFold -> n)))
-  = any ((n `T.isInfixOf`) . T.toCaseFold . unName . recipientName)
-  . threadRecipients
+matchRecipientName :: Name -> SmsThread -> Bool
+matchRecipientName (Name (T.toCaseFold -> n)) t = any match names where
+  names = (t^.threadRecipients.to toList)^..each.recipientName
+  match = (n `T.isInfixOf`) . T.toCaseFold . unName
