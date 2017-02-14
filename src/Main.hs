@@ -77,7 +77,7 @@ cliRequest
             <*> (
               option (Left . SmsThreadId <$> raw) (long "thread")
               <|>
-              option (Right . FuzzyName <$> raw) (long "name")
+              option (Right . fuzz <$> raw) (long "name")
             )
         )
         <>
@@ -91,7 +91,7 @@ cliRequest
             <*> (
               option (ByNumber . PhoneNumber <$> raw) (long "number")
               <|>
-              option (ByName . FuzzyName <$> raw) (long "to")
+              option (ByName . fuzz <$> raw) (long "to")
             )
             <*> option raw (long "message")
         )
@@ -108,7 +108,7 @@ cliRequest
             )
             <*> optional (option (DeviceId <$> raw) (long "device"))
             <*> optional
-              (option (FuzzyName <$> raw) (long "involving"))
+              (option (fuzz <$> raw) (long "involving"))
         )
       )
     )
