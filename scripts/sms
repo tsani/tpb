@@ -1,0 +1,22 @@
+#!/bin/bash
+
+ACTION="$1"
+
+case "$ACTION" in
+    "to")
+        DEST="$2"
+        MSG="$3"
+        tpb sms send --to "$DEST" --message "$MSG"
+        ;;
+    "from")
+        SRC="$2"
+        tpb sms list --name "$SRC"
+        ;;
+    "threads")
+        tpb sms threads
+        ;;
+    *)
+        echo "Unknown action" "$ACTION" >&2
+        exit 1
+        ;;
+esac
