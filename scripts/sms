@@ -12,7 +12,7 @@ case "$ACTION" in
         SRC="$2"
         tpb sms list --name "$SRC"
         ;;
-    "threads")
+    ""|"threads")
         tpb sms threads
         ;;
     *)
