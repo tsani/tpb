@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -15,11 +16,12 @@ import Network.Pushbullet.Client
 import Network.Pushbullet.Misc
 import Network.Pushbullet.Types
 
-import Control.Monad.Free
-import Data.Bifunctor ( first )
+import Control.Monad.Except
+import Control.Monad.Free ( iterM )
 import Data.ByteString ( readFile )
 import qualified Data.ByteString as BS
 import Data.List.NonEmpty ( toList )
+import qualified Data.List.NonEmpty as N
 import Data.Monoid ( (<>) )
 import qualified Data.Text as T
 import Data.Text.Encoding ( decodeUtf8 )
@@ -60,24 +62,37 @@ cliRequest
       fullDescInfo $ subparser (
         command "list" (
           fullDescInfo $
-            pure (\d t -> do
+            pure (\d r -> do
               d' <- maybe (DeviceId <$> line device) pure d
-              pure $ inject <$> listSms d' t
+              pure $ inject <$> do
+                case r of
+                  Left t -> listSms d' t
+                  Right n@(FuzzyName n') -> do
+                    fuzzyLookupThread n d' >>= \case
+                      Nothing -> commandError $
+                        "failed to find recipient with name " <> n'
+                      Just t -> listSms d' (t^.threadId)
             )
             <*> optional (option (DeviceId <$> raw) (long "device"))
-            <*> option (SmsThreadId <$> raw) (long "thread")
+            <*> (
+              option (Left . SmsThreadId <$> raw) (long "thread")
+              <|>
+              option (Right . FuzzyName <$> raw) (long "name")
+            )
         )
         <>
         command "send" (
           fullDescInfo $
-            pure (\d n m -> do
+            pure (\d dest m -> do
               d' <- maybe (fmap DeviceId $ line device) pure d
-              pure $ inject <$> do
-                u <- me <&> (^.userId)
-                sendSms u d' n m
+              pure $ inject <$> smartSend dest m d'
             )
             <*> optional (option (DeviceId <$> raw) (long "device"))
-            <*> option (PhoneNumber <$> raw) (long "number")
+            <*> (
+              option (ByNumber . PhoneNumber <$> raw) (long "number")
+              <|>
+              option (ByName . FuzzyName <$> raw) (long "to")
+            )
             <*> option raw (long "message")
         )
         <>
@@ -87,11 +102,13 @@ cliRequest
               d' <- maybe (fmap DeviceId $ line device) pure d
               pure $ inject <$> do
                 threads <- listThreads d'
-                let match = maybe (const True) matchRecipientName n
+                let true = const True
+                let match = maybe true fuzzyMatchThreadRecipientName n
                 pure (filter match threads)
             )
             <*> optional (option (DeviceId <$> raw) (long "device"))
-            <*> optional (option (Name <$> raw) (long "involving"))
+            <*> optional
+              (option (FuzzyName <$> raw) (long "involving"))
         )
       )
     )
@@ -123,7 +140,9 @@ run (Request format key cmd) = do
   let env = ClientEnv manager url
 
   let comm = httpCommand key cmd'
-  response <- fmap (first ServantError) . flip runClientM env $ comm
+  let runClient = flip runClientM env
+  let runE = runExceptT
+  response <- fmap (liftE2 ServantError CommandError) . runClient . runE $ comm
 
   case response of
     Left e -> do
@@ -134,26 +153,33 @@ run (Request format key cmd) = do
 
 -- | Interprets a computation in the 'Command' monad into a computation in the
 -- 'ClientM' monad that actually performs HTTP requests.
-httpCommand :: PushbulletKey -> Command a -> ClientM a
+httpCommand :: PushbulletKey -> Command a -> ExceptT T.Text ClientM a
 httpCommand key = iterM phi where
   auth = pushbulletAuth key
 
-  phi :: CommandF (ClientM a) -> ClientM a
+  phi :: CommandF (ExceptT T.Text ClientM a) -> ExceptT T.Text ClientM a
   phi com = case com of
     ListSms d t k ->
-      k . unSmsMessages =<< getSmsMessages auth (d `MessagesIn` t)
+      k . unSmsMessages
+        =<< lift (getSmsMessages auth (d `MessagesIn` t))
 
     ListThreads d k ->
-      k . unSmsThreads =<< getSmsThreads auth (ThreadsOf d)
+      k . unSmsThreads
+        =<< lift (getSmsThreads auth (ThreadsOf d))
 
-    SendSms u d n m k -> createEphemeral auth (Sms u d n m) *> k
+    SendSms u d n m k ->
+      lift (createEphemeral auth (Sms u d n m)) *> k
 
     ListDevices count k -> do
-      let getDevices' a = fmap (fmap unExistingDevices) . getDevices auth a
+      let f = fmap (fmap unExistingDevices)
+      let getDevices' a = f . lift . getDevices auth a
       start <- getDevices' Nothing Nothing
-      k =<< getPaginatedLimit count start (getDevices' Nothing . Just)
+      let next = getDevices' Nothing . Just
+      k =<< getPaginatedLimit count start next
 
-    Me k -> k =<< getMe auth
+    Me k -> k =<< lift (getMe auth)
+
+    ThrowCommandError e -> throwError e
 
 fullDescInfo :: Parser a -> ParserInfo a
 fullDescInfo p = info (helper <*> p) fullDesc
@@ -175,6 +201,7 @@ type Request'
 
 data Error
   = ServantError ServantError
+  | CommandError T.Text
   deriving (Eq, Show)
 
 ePutStrLn :: String -> IO ()
@@ -183,7 +210,48 @@ ePutStrLn = hPutStrLn stderr
 -- | Match a name to an sms thread. If there is no name given, always produces
 -- True. Otherwise, returns True if and only if there exists a recipient of the
 -- thread whose casefolded name contains the given name as a substring.
-matchRecipientName :: Name -> SmsThread -> Bool
-matchRecipientName (Name (T.toCaseFold -> n)) t = any match names where
+fuzzyMatchThreadRecipientName :: FuzzyName -> SmsThread -> Bool
+fuzzyMatchThreadRecipientName f t = any (fuzzyMatchName f) names where
   names = (t^.threadRecipients.to toList)^..each.recipientName
-  match = (n `T.isInfixOf`) . T.toCaseFold . unName
+
+fuzzyMatchName :: FuzzyName -> Name -> Bool
+fuzzyMatchName (FuzzyName f) (Name n) = f `T.isInfixOf` T.toCaseFold n
+
+data SendDest
+  = ByName FuzzyName
+  | ByNumber PhoneNumber
+
+newtype FuzzyName = FuzzyName T.Text
+
+fuzz :: T.Text -> FuzzyName
+fuzz = FuzzyName . T.toCaseFold
+
+-- | Look up a thread by fuzzy-matching a recipient's name.
+fuzzyLookupThread
+  :: FuzzyName -> DeviceId -> Command (Maybe SmsThread)
+fuzzyLookupThread f d = do
+  threads <- listThreads d
+  pure $ case filter (fuzzyMatchThreadRecipientName f) threads of
+    (t:_) -> Just t
+    _ -> Nothing
+
+smartSend :: SendDest -> T.Text -> DeviceId -> Command ()
+smartSend dest m d = do
+  case dest of
+    ByName name@(FuzzyName name') -> do
+      fuzzyLookupThread name d >>= \case
+        Nothing -> commandError $
+          "failed to find recipient with name " <> name'
+        Just t -> send' (t^.threadRecipients.to N.head.recipientNumber)
+    ByNumber n -> send' n
+  where
+    send' n = do
+      u <- me <&> (^. userId)
+      sendSms u d n m
+
+liftE2
+  :: (a -> e)
+  -> (b -> e)
+  -> Either a (Either b r)
+  -> Either e r
+liftE2 f g = either (Left . f) (either (Left . g) Right)

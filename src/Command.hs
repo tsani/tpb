@@ -22,6 +22,7 @@ data CommandF a where
   -- | List the devices.
   ListDevices :: Count -> ([Device 'Existing] -> a) -> CommandF a
   Me :: (User -> a) -> CommandF a
+  ThrowCommandError :: T.Text -> CommandF a
   deriving Functor
 
 -- | The Command monad.
@@ -41,3 +42,6 @@ listDevices c = liftF (ListDevices c id)
 
 me :: Command User
 me = liftF (Me id)
+
+commandError :: T.Text -> Command a
+commandError = Free . ThrowCommandError

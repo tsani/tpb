@@ -38,11 +38,11 @@ instance RenderableFormat T.Text where
 
 -- | Existential that wraps up a renderable format applied to some type
 -- constructor.
-data ExistsRenderableFormat f
-  = forall fmt. RenderableFormat fmt
-  => ExistsRenderableFormat
-    { getFormat :: f fmt
-    }
+data ExistsRenderableFormat f where
+  ExistsRenderableFormat
+    :: RenderableFormat fmt
+    => f fmt
+    -> ExistsRenderableFormat f
 
 -- | A monad for formatting text. This is just a kleisli arrow!
 newtype FormatM i m o = FormatM { unFormatM :: i -> m o }
