@@ -3,10 +3,6 @@
  - Pushbullet API.
  -}
 
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE GADTs #-}
-
 module Command where
 
 import Network.Pushbullet.Types

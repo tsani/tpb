@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE StandaloneDeriving #-}
-
 module Request where
 
 import Command
