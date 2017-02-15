@@ -2,4 +2,4 @@
 # scripts that invoke the example program and filter results using jq.
 # Of course, jq needs to be installed!
 
-export PATH=$PWD/scripts:$PATH
+export PATH=$PWD/scripts:$PWD/dist/build/tpb:$PATH
