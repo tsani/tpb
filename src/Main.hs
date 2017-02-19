@@ -31,6 +31,7 @@ import Network.HTTP.Client.TLS ( tlsManagerSettings )
 import Options.Applicative
 import Prelude hiding ( readFile )
 import Servant.Client
+import System.Environment ( getEnv )
 import System.Exit ( exitFailure )
 import System.IO ( stderr, hPutStrLn )
 
@@ -56,14 +57,14 @@ cliRequest
     (long "jsv")
   <*> option
     (fmap pure $ PushbulletKey <$> raw)
-    (long "key" <> value (PushbulletKey <$> line access))
+    (long "key" <> value access)
   <*> subparser (
     command "sms" (
       fullDescInfo $ subparser (
         command "list" (
           fullDescInfo $
             pure (\d r -> do
-              d' <- maybe (DeviceId <$> line device) pure d
+              d' <- maybe device pure d
               pure $ inject <$> do
                 case r of
                   Left t -> listSms d' t
@@ -84,7 +85,7 @@ cliRequest
         command "send" (
           fullDescInfo $
             pure (\d dest m -> do
-              d' <- maybe (fmap DeviceId $ line device) pure d
+              d' <- maybe device pure d
               pure $ inject <$> smartSend dest m d'
             )
             <*> optional (option (DeviceId <$> raw) (long "device"))
@@ -99,7 +100,7 @@ cliRequest
         command "threads" (
           fullDescInfo $
             pure (\d n -> do
-              d' <- maybe (fmap DeviceId $ line device) pure d
+              d' <- maybe device pure d
               pure $ inject <$> do
                 threads <- listThreads d'
                 let true = const True
@@ -190,11 +191,11 @@ raw = T.pack <$> str
 line :: FilePath -> IO T.Text
 line p = decodeUtf8 . BS.init <$> readFile p
 
-device :: String
-device = "/home/tsani/.phoneDeviceID"
+device :: IO DeviceId
+device = DeviceId . T.pack <$> getEnv "PUSHBULLET_DEVICE"
 
-access :: String
-access = "/home/tsani/.pushbulletaccess"
+access :: IO PushbulletKey
+access = PushbulletKey . T.pack <$> getEnv "PUSHBULLET_KEY"
 
 type Request'
   = Request IO PushbulletKey
