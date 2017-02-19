@@ -42,6 +42,7 @@ executable tpb
     microlens >=0.4 && <0.5,
     mtl >=2.2 && <2.3,
     optparse-applicative >=0.13 && <0.14,
+    pushbullet-types >=0.0.1 && <0.1,
     text,
     time >=1.6 && <1.7,
     servant,
