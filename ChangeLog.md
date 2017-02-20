@@ -1,5 +1,31 @@
 # Revision history for tpb
 
-## 0.1.0.0  -- YYYY-mm-dd
+## 0.1.0.0  -- 2017-02-20
 
-* First version. Released on an unsuspecting world.
+This version releases the `tpb` and `pb-notify` programs as well as some
+accompanying scripts.
+
+### tpb features
+
+* multiple output formats:
+  * for standalone usage, nice human-readable formatting; and
+  * for usage in scripts, tabular output as JSON separated values.
+* list devices.
+* list SMS threads on a device.
+* list contents of an SMS thread on a device, either:
+  * by thread ID; or
+  * by fuzzy-matching the recipient's name to find the thread ID.
+* send SMS, either :
+  * by giving an explicit phone number; or
+  * by fuzzy-matching the recipient's name to find their phone number.
+
+tpb requires no configuration if you fill out all the command line options, but
+some options that are used everywhere (like the Pushbullet API key and the
+device ID, assuming you use only one device) can be specified via environment
+variables.
+
+### pb-notify features
+
+* API key configuration via environment variables.
+* Any SMS received on any Pushbullet device associated to the API key will be
+  shown as a desktop notification via libnotify.
