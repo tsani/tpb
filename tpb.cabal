@@ -3,13 +3,16 @@
 
 name:                tpb
 version:             0.1.0.0
--- synopsis:            
--- description:         
+synopsis:            Applications for interacting with the Pushbullet API
+description:
+  This package provides two programs, tpb and pb-notify, for interacting with
+  the Pushbullet API. The former is primarily used for sending SMS whereas the
+  latter is used for showing desktop notifications when SMS are received.
 license:             GPL-3
 license-file:        LICENSE
-author:              Jacob Errington
-maintainer:          git@mail.jerrington.me
--- copyright:           
+author:              Jacob Thomas Errington
+maintainer:          hackage@mail.jerrington.me
+copyright:           Jacob Thomas Errington 2017
 category:            Web
 build-type:          Simple
 extra-source-files:  ChangeLog.md
