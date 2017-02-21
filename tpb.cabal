@@ -38,6 +38,15 @@ executable tpb
     GeneralizedNewtypeDeriving
     StandaloneDeriving
   main-is: Main.hs
+  other-modules:
+    Command,
+    Count,
+    Format,
+    Request,
+    ResponseFormat,
+    ResponseFormat.HumanTable,
+    ResponseFormat.JSV,
+    Sum
   ghc-options:
     -Wall
   build-depends:
