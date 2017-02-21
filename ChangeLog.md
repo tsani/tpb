@@ -1,5 +1,11 @@
 # Revision history for tpb
 
+## 0.1.1.0  -- 2017-02-20
+
+* remove unused module.
+* declare all modules in `other-modules` so cabal includes them in source
+  distributions.
+
 ## 0.1.0.0  -- 2017-02-20
 
 This version releases the `tpb` and `pb-notify` programs as well as some

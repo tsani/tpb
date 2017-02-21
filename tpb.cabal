@@ -2,7 +2,7 @@
 -- see http://haskell.org/cabal/users-guide/
 
 name:                tpb
-version:             0.1.0.0
+version:             0.1.1.0
 synopsis:            Applications for interacting with the Pushbullet API
 description:
   This package provides two programs, tpb and pb-notify, for interacting with
@@ -24,8 +24,8 @@ source-repository head
 
 source-repository this
   type: git
-  location: https://github.com/tsani/tpb/releases/tag/v0.1.0.0
-  tag: v0.1.0.0
+  location: https://github.com/tsani/tpb/releases/tag/v0.1.1.0
+  tag: v0.1.1.0
 
 executable tpb
   hs-source-dirs: src/tpb
