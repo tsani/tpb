@@ -1,5 +1,10 @@
 # Revision history for tpb
 
+## 0.1.1.1  -- 2017-02-20
+
+* add `app_name` libnotify hint in pb-notify, so applications processing
+  notifications sent by pb-notify can do special logic.
+
 ## 0.1.1.0  -- 2017-02-20
 
 * remove unused module.
