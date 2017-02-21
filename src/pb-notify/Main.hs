@@ -17,6 +17,9 @@ import qualified Network.WebSockets as WS
 import System.Environment ( getEnv )
 import Wuss ( runSecureClient )
 
+appName :: String
+appName = "pb-notify"
+
 main :: IO ()
 main = do
   token <- getEnv "PUSHBULLET_KEY"
@@ -32,11 +35,11 @@ ws connection = forever $ do
       SmsChanged{..} ->
         forM_ _ephNotifications $ \Notification{..} -> do
           t <- niceTime _notifTime
-          Noti.display_ $
-            Noti.summary (T.unpack $ "SMS from " <> _notifTitle) <>
-            Noti.body (
-              T.unpack (_notifBody <> "\n") <> t
-            )
+          Noti.display_ $ mconcat
+            [ Noti.summary (T.unpack $ "SMS from " <> _notifTitle)
+            , Noti.body (T.unpack (_notifBody <> "\n") <> t)
+            , Noti.appName appName
+            ]
       _ -> pure ()
 
 niceTime :: PushbulletTime -> IO String
