@@ -12,6 +12,14 @@ case "$ACTION" in
         SRC="$2"
         tpb sms list --name "$SRC"
         ;;
+    "urls")
+        SRC="$2"
+        tpb --jsv sms list --name "$SRC" |
+        tac |
+        jq -r \
+            'select(.direction == "incoming") | .body' |
+        grep -Eo 'https?://[^[:space:]]+'
+        ;;
     ""|"threads")
         tpb sms threads
         ;;
