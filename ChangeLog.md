@@ -1,5 +1,10 @@
 # Revision history for tpb
 
+## 0.2.0.0  -- 2017-04-30
+
+* Partially fix connectivity bugs in pb-notify.
+* Mirror pushes in pb-notify.
+
 ## 0.1.1.1  -- 2017-02-20
 
 * add `app_name` libnotify hint in pb-notify, so applications processing
