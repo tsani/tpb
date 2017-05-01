@@ -63,12 +63,12 @@ executable tpb
     microlens >=0.4 && <0.5,
     mtl >=2.2 && <2.3,
     optparse-applicative >=0.13 && <0.14,
-    pushbullet-types >=0.1 && <0.2,
+    pushbullet-types >=0.2 && <0.3,
     text >=1.2 && <1.3,
     time >=1.6 && <1.7,
     servant >=0.9 && <0.10,
     servant-client >=0.9 && <0.10,
-    servant-pushbullet-client >=0.1 && <0.2
+    servant-pushbullet-client >=0.2 && <0.3
 
 executable pb-notify
   hs-source-dirs: src/pb-notify
@@ -84,9 +84,9 @@ executable pb-notify
     http-client >=0.5 && <0.6,
     http-client-tls >=0.3 && <0.4,
     libnotify >=0.2 && <0.3,
-    pushbullet-types >=0.1 && <0.2,
+    pushbullet-types >=0.2 && <0.3,
     servant-client >=0.9 && <0.10,
-    servant-pushbullet-client >=0.1 && <0.2,
+    servant-pushbullet-client >=0.2 && <0.3,
     text >=1.2 && <1.3,
     time >=1.6 && <1.7,
     websockets >=0.10 && <0.11,
