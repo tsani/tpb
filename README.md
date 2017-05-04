@@ -33,7 +33,9 @@ syntax; just type `sms to jacob "hello world"` to send a text message!
 
 #### pb-notify
 
-  * send libnotify notifications when SMS are received by any of your
-    Pushbullet-connected devices.
+Sends libnotify notifications when:
+
+  * SMS are received by any of your connected devices
+  * Pushes are received by any connected devices
 
 [post]: https://jerrington.me/posts/2017-02-20-sms-command-line.html
