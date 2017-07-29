@@ -68,7 +68,7 @@ executable tpb
     time >=1.6 && <1.7,
     servant >=0.9 && <0.12,
     servant-client >=0.9 && <0.12,
-    servant-pushbullet-client >=0.2 && <0.3
+    servant-pushbullet-client >=0.3 && <0.4
 
 executable pb-notify
   hs-source-dirs: src/pb-notify
@@ -87,7 +87,7 @@ executable pb-notify
     libnotify >=0.2 && <0.3,
     pushbullet-types >=0.3 && <0.4,
     servant-client >=0.9 && <0.12,
-    servant-pushbullet-client >=0.2 && <0.3,
+    servant-pushbullet-client >=0.3 && <0.4,
     servant-server >=0.9 && <0.12,
     text >=1.2 && <1.3,
     time >=1.6 && <1.7,
