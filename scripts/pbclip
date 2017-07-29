@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if test -z "$PBNOTIFY_PORT" ; then
+    echo >&2 "\$PBNOTIFY_PORT is not set"
+    exit 1
+fi
+
+TEXT="$1"
+
+if test -z "$TEXT" ; then
+    curl --fail --silent http://localhost:$PBNOTIFY_PORT/clip
+else
+    curl --fail --silent --data "$TEXT" \
+        -H "Content-type: text/plain;charset=utf-8" \
+        http://localhost:$PBNOTIFY_PORT/clip
+fi
