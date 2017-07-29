@@ -205,7 +205,7 @@ httpCommand key = iterM phi where
         =<< lift (getSmsThreads auth (ThreadsOf d))
 
     SendSms u d n m k ->
-      lift (createEphemeral auth (PushEphemeral (Sms u d n m))) *> k
+      lift (createEphemeral auth (PushEphemeral Nothing (Sms u d n m))) *> k
 
     ListDevices count k -> do
       let f = fmap (fmap unExistingDevices)
