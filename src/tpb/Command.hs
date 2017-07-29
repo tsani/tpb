@@ -15,14 +15,28 @@ import qualified Data.Text as T
 data CommandF a where
   -- | List the SMS messages in a thread on a device.
   ListSms :: DeviceId -> SmsThreadId -> ([SmsMessage] -> a) -> CommandF a
+
   -- | List the SMS threads on a device.
   ListThreads :: DeviceId -> ([SmsThread] -> a) -> CommandF a
+
   -- | Send an SMS with a device to a phone.
   SendSms :: UserId -> DeviceId -> PhoneNumber -> T.Text -> a -> CommandF a
+
   -- | List the devices.
   ListDevices :: Count -> ([Device 'Existing] -> a) -> CommandF a
+
+  -- | Create a new device.
+  MakeDevice :: Device 'New -> (Device 'Existing -> a) -> CommandF a
+
+  -- | Remove an existing device.
+  RemoveDevice :: DeviceId -> a -> CommandF a
+
+  -- | Get the current user info.
   Me :: (User -> a) -> CommandF a
+
+  -- | Raise an exception.
   ThrowCommandError :: T.Text -> CommandF a
+
   deriving Functor
 
 -- | The Command monad.
@@ -30,6 +44,9 @@ type Command = Free CommandF
 
 listSms :: DeviceId -> SmsThreadId -> Command [SmsMessage]
 listSms d t = liftF (ListSms d t id)
+
+removeDevice :: DeviceId -> Command ()
+removeDevice d = liftF (RemoveDevice d ())
 
 listThreads :: DeviceId -> Command [SmsThread]
 listThreads d = liftF (ListThreads d id)
@@ -39,6 +56,9 @@ sendSms u d p t = liftF (SendSms u d p t ())
 
 listDevices :: Count -> Command [Device 'Existing]
 listDevices c = liftF (ListDevices c id)
+
+makeDevice :: Device 'New -> Command (Device 'Existing)
+makeDevice d = liftF (MakeDevice d id)
 
 me :: Command User
 me = liftF (Me id)

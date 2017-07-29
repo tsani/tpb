@@ -18,10 +18,12 @@ import Network.Pushbullet.Types
 
 import Control.Monad.Except
 import Control.Monad.Free ( iterM )
+import Data.Bool ( bool )
 import Data.ByteString ( readFile )
 import qualified Data.ByteString as BS
 import Data.List.NonEmpty ( toList )
 import qualified Data.List.NonEmpty as N
+import Data.Maybe ( fromMaybe )
 import Data.Monoid ( (<>) )
 import qualified Data.Text as T
 import Data.Text.Encoding ( decodeUtf8 )
@@ -124,6 +126,40 @@ cliRequest
             )
             <*> optional (option (Limit <$> auto) (long "limit"))
         )
+        <>
+        command "create" (
+          fullDescInfo $
+            pure (\name sms manuf model icon -> do
+              let sms' = maybe NoSms (bool NoSms HasSms) sms
+              pure $ inject <$> makeDevice Device
+                { _deviceId = ()
+                , _deviceActive = ()
+                , _deviceCreated = ()
+                , _deviceModified = ()
+                , _deviceIcon = fromMaybe deviceIconSystem icon
+                , _deviceNickname = Just name
+                , _deviceGeneratedNickname = ()
+                , _deviceManufacturer = manuf
+                , _deviceModel = model
+                , _deviceAppVersion = Nothing
+                , _deviceFingerprint = ()
+                , _deviceKeyFingerprint = ()
+                , _deviceHasSms = sms'
+                , _devicePushToken = Nothing
+                }
+            )
+            <*> option (Nickname <$> raw) (long "name")
+            <*> optional (switch (long "has-sms"))
+            <*> optional (option (Manufacturer <$> raw) (long "manufacturer"))
+            <*> optional (option (Model <$> raw) (long "model"))
+            <*> optional (option (DeviceIcon <$> raw) (long "icon"))
+        )
+        <>
+        command "delete" (
+          fullDescInfo $
+            pure (\did -> pure $ inject <$> removeDevice did)
+            <*> option (DeviceId <$> raw) (long "by-id")
+        )
       )
     )
   )
@@ -177,6 +213,10 @@ httpCommand key = iterM phi where
       start <- getDevices' Nothing Nothing
       let next = getDevices' Nothing . Just
       k =<< getPaginatedLimit count start next
+
+    MakeDevice d k -> k =<< lift (createDevice auth d)
+
+    RemoveDevice did k -> lift (deleteDevice auth did) *> k
 
     Me k -> k =<< lift (getMe auth)
 

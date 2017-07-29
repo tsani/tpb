@@ -29,10 +29,10 @@ newtype HumanTable = HumanTable P.Doc
 
 formatHumanTable
   :: Product
-    '[[SmsMessage], [SmsThread], (), [Device 'Existing]]
+    '[[SmsMessage], [SmsThread], (), [Device 'Existing], Device 'Existing]
     (IO HumanTable)
 formatHumanTable
-  = smsMessage -| smsThreads -| ok -| devices -| Inexhaustive where
+  = smsMessage -| smsThreads -| ok -| devices -| device1 -| Inexhaustive where
 
     chronologicalBy l = sortBy (comparing l)
 
@@ -89,6 +89,9 @@ formatHumanTable
 
     devices :: [Device 'Existing] -> IO HumanTable
     devices = error "nice devices listing is not implemented"
+
+    device1 :: Device 'Existing -> IO HumanTable
+    device1 = error "nice device listing is not implemented"
 
     niceTime (PushbulletTime t) =
       formatTime defaultTimeLocale "%a %d %b %Y @ %H:%M:%S"

@@ -34,9 +34,16 @@ instance ToJSON JsvCell where
   toJSON (JsvCell cell) = toJSON cell
 
 formatJsv
-  :: Product '[[SmsMessage], [SmsThread], (), [Device 'Existing]] JSV
+  :: Product
+    '[[SmsMessage], [SmsThread], (), [Device 'Existing], Device 'Existing]
+    JSV
 formatJsv
-  = JSV . map pure <$> (sms -| threads -| ok -| devices -| Inexhaustive) where
+  = JSV
+  . map pure
+  <$> (sms -| threads -| ok -| devices -| device -| Inexhaustive) where
+    device :: Device 'Existing -> [JsvCell]
+    device = pure . JsvCell . Formatted
+
     sms :: [SmsMessage] -> [JsvCell]
     sms = map (JsvCell . Formatted)
 
