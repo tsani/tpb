@@ -1,5 +1,14 @@
 # Revision history for tpb
 
+## 0.3.0.0  -- 2017-07-29
+
+* implement clipboard integration in pb-notify via a built-in HTTP server.
+* add script pbclip for interacting with the pushbullet clipboard via
+  pb-notify.
+* tpb: add `devices create` and `devices remove` commands
+* tpb: support pushbullet-types 0.3
+* bump dependency on servant-pushbullet-client to 0.3
+
 ## 0.2.0.0  -- 2017-04-30
 
 * Partially fix connectivity bugs in pb-notify.
