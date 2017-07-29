@@ -18,7 +18,7 @@ import Control.Concurrent.Chan
 import Control.Concurrent.MVar
 import Control.Monad ( forever, forM_ )
 import Control.Monad.IO.Class
-import Data.Aeson ( eitherDecode', encode )
+import Data.Aeson ( eitherDecode' )
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as LBS
 import Data.IORef
@@ -28,7 +28,6 @@ import Data.Maybe ( listToMaybe )
 import Data.Monoid ( (<>) )
 import Data.Ord ( comparing )
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import Data.Time.Format ( defaultTimeLocale, formatTime )
 import Data.Time.LocalTime ( getTimeZone, utcToLocalTime )
 import qualified Libnotify as Noti
@@ -81,19 +80,6 @@ readClipVar :: ClipDataVar -> IO (Maybe T.Text)
 readClipVar (ClipDataVar lock r) = withMVar lock $ \case
   True -> Just <$> readIORef r
   False -> pure Nothing
-
-newtype ClipChan
-  = ClipChan
-    { unClipChan :: Chan () }
-
-newClipChan :: IO ClipChan
-newClipChan = ClipChan <$> newChan
-
-putClipChan :: ClipChan -> IO ()
-putClipChan (ClipChan c) = writeChan c ()
-
-getClipChan :: ClipChan -> IO ()
-getClipChan (ClipChan c) = readChan c
 
 newtype HttpChan
   = HttpChan
@@ -204,9 +190,7 @@ main = do
       }
 
   httpChan <- newHttpChan
-  clipChan <- newClipChan
   clipvar <- newClipDataVar
-  clipflag <- newIORef True
 
   notiVar <- NotifyMapVar <$> newMVar (NotifyMap M.empty)
 
@@ -216,7 +200,7 @@ main = do
   -- transformed into notifications.
   -- HTTP requests sent by this thread are retried indefinitely until they
   -- succeed.
-  _ <- async (http notiVar httpChan clipvar makeClipEphemeral key)
+  _ <- async (http notiVar httpChan makeClipEphemeral key)
 
   -- run the http server thread
   -- This thread runs a dead simple API to access the pushbullet clipboard
@@ -233,7 +217,7 @@ main = do
 
   forever $ do
     a <- async $ do
-      wsclient (ws httpChan clipvar clipChan)
+      wsclient (ws httpChan clipvar)
 
     waitCatch a >>= \case
       Left err -> print err
@@ -256,11 +240,10 @@ getUser key = do
 http
   :: NotifyMapVar
   -> HttpChan
-  -> ClipDataVar
   -> (T.Text -> Ephemeral)
   -> PushbulletKey
   -> IO ()
-http notiVar httpChan clipvar mke key = do
+http notiVar httpChan mke key = do
   let auth = pushbulletAuth key
 
   manager <- newManager tlsManagerSettings
@@ -332,10 +315,8 @@ ws
   -- ^ The channel used to wake up the HTTP thread to check for new pushes
   -> ClipDataVar
   -- ^ The variable to store our clipboard buffer in
-  -> ClipChan
-  -- ^ The channel we wait on for requests to send the clipboard to pushbullet
   -> WS.ClientApp ()
-ws httpChan clipvar clipChan connection = recv where
+ws httpChan clipvar connection = recv where
   recv :: IO ()
   recv = do
     -- this timeout is set to 35s. Pushbullet is supposed to send us a
@@ -353,7 +334,7 @@ handle httpChan (ClipDataVar lock clip) raw = do
       Tickle t -> case t of
         PushType -> checkPushes httpChan
         OtherType t' -> putStrLn $ "got other tickle: " ++ T.unpack t'
-      PushEphemeral targets p -> case p of
+      PushEphemeral _ p -> case p of
         SmsChanged{..} ->
           forM_ _ephNotifications $ \Notification{..} -> do
             t <- niceTime _notifTime
