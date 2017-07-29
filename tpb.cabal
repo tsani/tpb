@@ -8,6 +8,14 @@ description:
   This package provides two programs, tpb and pb-notify, for interacting with
   the Pushbullet API. The former is primarily used for sending SMS whereas the
   latter is used for showing desktop notifications when SMS are received.
+  tpb additionally supports a number of additional management commands for
+  creating and deleting resources inside PushBullet.
+  pb-notify is responsible for integration with PushBullet's Universal
+  Copy/Paste feature. It maintains an internal buffer that is kept in sync with
+  PushBullet's clipboard. This buffer can be accessed via pb-notify's built-in
+  HTTP server. A POST request to the /clip endpoint of the server will in turn
+  send the necessary request to PushBullet to set the clipboard of all
+  connected devices.
 license:             GPL-3
 license-file:        LICENSE
 author:              Jacob Thomas Errington
