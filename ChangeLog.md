@@ -1,5 +1,12 @@
 # Revision history for tpb
 
+## 0.4.0.0  -- 2017-08-01
+
+* Bump dependency on servant-pushbullet-client and pushbullet-types to 0.4.
+  This version includes important fixes for parsing pushes sent by channels and
+  link pushes without bodies.
+* pb-notify: Improve formatting of notification text for link pushes.
+
 ## 0.3.0.0  -- 2017-07-29
 
 * implement clipboard integration in pb-notify via a built-in HTTP server.
