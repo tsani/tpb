@@ -301,7 +301,7 @@ preparePushNotification pushData = mconcat $ case pushData of
     ]
   LinkPush{..} ->
     [ Noti.summary ("Link: " ++ maybe "[untitled]" T.unpack pushTitle)
-    , Noti.body (T.unpack pushBody)
+    , Noti.body $ T.unpack $ formatLinkPush pushUrl pushLinkBody
     , Noti.appName appName
     ]
   FilePush{..} ->
@@ -309,6 +309,10 @@ preparePushNotification pushData = mconcat $ case pushData of
     , Noti.body (T.unpack (unUrl pushFileUrl))
     , Noti.appName appName
     ]
+  where
+    formatLinkPush (Url url) mbody = case mbody of
+      Nothing -> url
+      Just body -> body <> "\n" <> url
 
 ws
   :: HttpChan
