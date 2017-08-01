@@ -4,3 +4,4 @@
 /.cabal-sandbox/
 /.secrets
 /cabal.project.local
+/.stack-work/
