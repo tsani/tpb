@@ -27,6 +27,8 @@ import Data.Maybe ( fromMaybe )
 import Data.Monoid ( (<>) )
 import qualified Data.Text as T
 import Data.Text.Encoding ( decodeUtf8 )
+import Data.Time.Clock ( getCurrentTime )
+import Data.Time.LocalTime ( TimeZone, getTimeZone )
 import Lens.Micro
 import Network.HTTP.Client ( newManager )
 import Network.HTTP.Client.TLS ( tlsManagerSettings )
@@ -39,7 +41,7 @@ import System.IO ( stderr, hPutStrLn )
 
 main :: IO ()
 main
-  = execParser opts
+  = (execParser . opts =<< getTimeZone =<< getCurrentTime)
     -- parse commandline options, putting IO actions to be executed later in
     -- place of missing values
   >>= sequence
@@ -47,14 +49,14 @@ main
   >>= run
     -- execute the request
 
-opts :: ParserInfo (Request IO (IO PushbulletKey))
-opts = fullDescInfo cliRequest
+opts :: TimeZone -> ParserInfo (Request IO (IO PushbulletKey))
+opts = fullDescInfo . cliRequest
 
-cliRequest :: Parser (Request IO (IO PushbulletKey))
-cliRequest
+cliRequest :: TimeZone -> Parser (Request IO (IO PushbulletKey))
+cliRequest tz
   = pure Request
   <*> flag
-    (ExistsRenderableFormat <$> formatHumanTable)
+    (ExistsRenderableFormat . pure <$> (formatHumanTable tz))
     (ExistsRenderableFormat . pure <$> formatJsv)
     (long "jsv")
   <*> option
@@ -162,6 +164,19 @@ cliRequest
         )
       )
     )
+    <>
+    command "push" (
+      fullDescInfo $ subparser (
+        command "list" (
+          fullDescInfo $
+            pure (\c -> do
+              let c' = maybe All id c
+              pure $ inject <$> listPushes c'
+            )
+            <*> optional (option (Limit <$> auto) (long "limit"))
+        )
+      )
+    )
   )
 
 -- | Execute a request.
@@ -200,6 +215,11 @@ httpCommand key = iterM phi where
       k . unSmsMessages
         =<< lift (getSmsMessages auth (d `MessagesIn` t))
 
+    ListPushes count k -> do
+      let f = fmap (fmap unExistingPushes)
+      let getPushes' = f . lift . getPushes auth Nothing Nothing Nothing
+      k =<< getPaginatedLimit' count getPushes'
+
     ListThreads d k ->
       k . unSmsThreads
         =<< lift (getSmsThreads auth (ThreadsOf d))
@@ -209,10 +229,8 @@ httpCommand key = iterM phi where
 
     ListDevices count k -> do
       let f = fmap (fmap unExistingDevices)
-      let getDevices' a = f . lift . getDevices auth a
-      start <- getDevices' Nothing Nothing
-      let next = getDevices' Nothing . Just
-      k =<< getPaginatedLimit count start next
+      let getDevices' = f . lift . getDevices auth Nothing
+      k =<< getPaginatedLimit' count getDevices'
 
     MakeDevice d k -> k =<< lift (createDevice auth d)
 

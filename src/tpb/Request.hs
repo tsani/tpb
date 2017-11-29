@@ -13,12 +13,12 @@ import qualified Data.Text as T
 -- command must compute a result in an open sum type that can be handled by a
 -- 'Product' to convert that result into a renderable format, possibly using
 -- monadic effects.
-data Request m key where
+data Request m env where
   Request
     :: Product ts (ExistsRenderableFormat m)
-    -> key
+    -> env
     -> m (Command (Sum' ts))
-    -> Request m key
+    -> Request m env
 
 deriving instance Functor (Request m)
 deriving instance Foldable (Request m)

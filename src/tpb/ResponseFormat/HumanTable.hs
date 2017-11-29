@@ -20,7 +20,7 @@ import Data.Ord ( comparing )
 import qualified Data.Text as T
 import Data.Time.Clock ( diffUTCTime, NominalDiffTime )
 import Data.Time.Format ( defaultTimeLocale, formatTime )
-import Data.Time.LocalTime ( getTimeZone, utcToLocalTime )
+import Data.Time.LocalTime ( utcToLocalTime, TimeZone )
 import Lens.Micro
 import qualified Text.PrettyPrint.ANSI.Leijen as P
 
@@ -28,74 +28,99 @@ newtype HumanTable = HumanTable P.Doc
   deriving RenderableFormat
 
 formatHumanTable
-  :: Product
-    '[[SmsMessage], [SmsThread], (), [Device 'Existing], Device 'Existing]
-    (IO HumanTable)
-formatHumanTable
-  = smsMessage -| smsThreads -| ok -| devices -| device1 -| Inexhaustive where
+  :: TimeZone -> Product
+    '[[SmsMessage], [SmsThread], (), [Device 'Existing], Device 'Existing, [Push 'Existing]]
+    HumanTable
+formatHumanTable tz
+  = smsMessage -| smsThreads -| ok -| devices -| device1 -| pushes -| Inexhaustive where
 
     chronologicalBy l = sortBy (comparing l)
 
-    smsMessage :: [SmsMessage] -> IO HumanTable
+    pushes :: [Push 'Existing] -> HumanTable
+    pushes = HumanTable . P.vcat . map f where
+      f :: Push 'Existing -> P.Doc
+      f Push{..} = hd P.<$> P.indent 2 body P.<$> foot P.<$> "" where
+        hd = pushTypeName P.<+> "from" P.<+> pushSenderType P.<+> senderName
+
+        foot :: P.Doc
+        foot = P.text (niceTime tz pushModified)
+
+        body :: P.Doc
+        body =
+          maybe P.empty id ((("#" P.<+>) . text) <$> pushTitle pushData)
+          P.<$>
+          case pushData of
+            NotePush{..} -> paragraph pushBody
+            LinkPush{..} ->
+              text (unUrl pushUrl)
+              P.<$>
+              maybe P.empty paragraph pushLinkBody
+            FilePush{..} ->
+              text pushFileName P.<+> text (unUrl pushFileUrl)
+              P.<$>
+              maybe P.empty paragraph pushFileBody
+
+        senderName = text (unName $ pushSenderName pushSender)
+        pushTypeName = case pushData of
+          NotePush{} -> "Note"
+          LinkPush{} -> "Link"
+          FilePush{} -> "File"
+        pushSenderType = case pushSender of
+          SentByUser{} -> "user"
+          SentByChannel{} -> "channel"
+
+    smsMessage :: [SmsMessage] -> HumanTable
     smsMessage
       (chronologicalBy (^.smsTime) -> groupSms tenMins -> groups) =
-        HumanTable . P.vcat <$> (mapM phi groups) where
-          phi :: SmsGroup -> IO P.Doc
-          phi (SmsGroup msgs) = do
-            let msg = N.head msgs
-            let dir = msg^.smsDirection
-            t <- niceTime (msg^.smsTime)
-            pure $
-              P.vsep (
-                P.hang 2
-                . (arrow dir P.<+>)
-                . P.fillSep
-                . map P.text . words . T.unpack
-                . (^.smsBody)
-                <$> N.toList msgs
-              )
-              P.<$> "+" P.<+> P.text t P.<$> ""
+        HumanTable (P.vcat (map phi groups)) where
+          phi :: SmsGroup -> P.Doc
+          phi (SmsGroup msgs) =
+            P.vsep (
+              P.hang 2
+              . (arrow dir P.<+>)
+              . P.fillSep
+              . map P.text . words . T.unpack
+              . (^.smsBody)
+              <$> N.toList msgs
+            )
+            P.<$> "+" P.<+> P.text t P.<$> "" where
+              msg = N.head msgs
+              dir = msg^.smsDirection
+              t = niceTime tz (msg^.smsTime)
 
     tenMins :: NominalDiffTime
     tenMins = 60 * 10 -- ten minutes
 
-    smsThreads :: [SmsThread] -> IO HumanTable
+    smsThreads :: [SmsThread] -> HumanTable
     smsThreads
-      = fmap (HumanTable . P.vsep) -- join all the lines
-      . mapM phi -- convert the thread to a line of text
+      = (HumanTable . P.vsep) -- join all the lines
+      . map phi -- convert the thread to a line of text
       . chronologicalBy (^.threadLatest.smsTime)
         -- order by latest message in thread
       where
-        phi :: SmsThread -> IO P.Doc
-        phi t = do
-          -- let SmsThreadId i = threadId
-          -- let SmsMessage{..} = threadLatest
-          let unpackName = P.text . T.unpack . unName
-          let name = unpackName . (^.recipientName)
-          let recipientNames = map name . N.toList $ t^.threadRecipients
-          let rs = P.hcat (P.punctuate ", " recipientNames)
-          let niceBody = P.fillSep . map P.text . words . T.unpack
-          let msg = t^.threadLatest
-          let body = niceBody $ msg^.smsBody
-          time <- niceTime (msg^.smsTime)
-          pure $
-            dirName (msg^.smsDirection) P.<+> rs P.</>
-            "on" P.<+> P.text time P.<$>
-            P.indent 2 body P.<$>
-            ""
+        phi :: SmsThread -> P.Doc
+        phi t =
+          dirName (msg^.smsDirection) P.<+> rs P.</>
+          "on" P.<+> P.text time P.<$>
+          P.indent 2 body P.<$>
+          "" where
+            unpackName = text . unName
+            name = unpackName . (^.recipientName)
+            recipientNames = map name . N.toList $ t^.threadRecipients
+            rs = P.hcat (P.punctuate ", " recipientNames)
+            niceBody = P.fillSep . map P.text . words . T.unpack
+            msg = t^.threadLatest
+            body = niceBody $ msg^.smsBody
+            time = niceTime tz (msg^.smsTime)
 
-    ok :: () -> IO HumanTable
-    ok _ = pure . HumanTable $ ""
+    ok :: () -> HumanTable
+    ok _ = HumanTable $ ""
 
-    devices :: [Device 'Existing] -> IO HumanTable
+    devices :: [Device 'Existing] -> HumanTable
     devices = error "nice devices listing is not implemented"
 
-    device1 :: Device 'Existing -> IO HumanTable
+    device1 :: Device 'Existing -> HumanTable
     device1 = error "nice device listing is not implemented"
-
-    niceTime (PushbulletTime t) =
-      formatTime defaultTimeLocale "%a %d %b %Y @ %H:%M:%S"
-        <$> (utcToLocalTime <$> getTimeZone t <*> pure t)
 
     arrow dir = case dir of
       OutgoingSms -> ">"
@@ -104,6 +129,9 @@ formatHumanTable
     dirName dir = case dir of
       OutgoingSms -> "to"
       IncomingSms -> "from"
+
+paragraph :: T.Text -> P.Doc
+paragraph = P.fillSep . map P.text . words . T.unpack
 
 -- | An SMS group is a bunch of messages from a given person ordered
 -- chronologically such that the timestamps of adjacent messages differ by no
@@ -135,3 +163,10 @@ groupSms d
     checkTime
       (SmsMessage{_smsTime=PushbulletTime u1})
       (SmsMessage{_smsTime=PushbulletTime u2}) = diffUTCTime u2 u1 < d
+
+text :: T.Text -> P.Doc
+text = P.text . T.unpack
+
+niceTime :: TimeZone -> PushbulletTime -> String
+niceTime tz (PushbulletTime t) =
+  formatTime defaultTimeLocale "%a %d %b %Y @ %H:%M:%S" (utcToLocalTime tz t)

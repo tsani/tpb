@@ -19,6 +19,9 @@ data CommandF a where
   -- | List the SMS threads on a device.
   ListThreads :: DeviceId -> ([SmsThread] -> a) -> CommandF a
 
+  -- | List the pushes sent to a device.
+  ListPushes :: Count -> ([Push 'Existing] -> a) -> CommandF a
+
   -- | Send an SMS with a device to a phone.
   SendSms :: UserId -> DeviceId -> PhoneNumber -> T.Text -> a -> CommandF a
 
@@ -44,6 +47,9 @@ type Command = Free CommandF
 
 listSms :: DeviceId -> SmsThreadId -> Command [SmsMessage]
 listSms d t = liftF (ListSms d t id)
+
+listPushes :: Count -> Command [Push 'Existing]
+listPushes c = liftF (ListPushes c id)
 
 removeDevice :: DeviceId -> Command ()
 removeDevice d = liftF (RemoveDevice d ())

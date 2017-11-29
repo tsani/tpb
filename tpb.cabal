@@ -50,6 +50,7 @@ executable tpb
     Command,
     Count,
     Format,
+    Misc,
     Request,
     ResponseFormat,
     ResponseFormat.HumanTable,

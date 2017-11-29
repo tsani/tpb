@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
@@ -11,6 +12,7 @@ module ResponseFormat.JSV
 
 import Format
 import Sum
+import Misc
 
 import Network.Pushbullet.Types
 
@@ -35,12 +37,12 @@ instance ToJSON JsvCell where
 
 formatJsv
   :: Product
-    '[[SmsMessage], [SmsThread], (), [Device 'Existing], Device 'Existing]
+    '[[SmsMessage], [SmsThread], (), [Device 'Existing], Device 'Existing, [Push 'Existing]]
     JSV
 formatJsv
   = JSV
   . map pure
-  <$> (sms -| threads -| ok -| devices -| device -| Inexhaustive) where
+  <$> (sms -| threads -| ok -| devices -| device -| pushes -| Inexhaustive) where
     device :: Device 'Existing -> [JsvCell]
     device = pure . JsvCell . Formatted
 
@@ -52,6 +54,9 @@ formatJsv
 
     devices :: [Device 'Existing] -> [JsvCell]
     devices = map (JsvCell . Formatted)
+
+    pushes :: [Push 'Existing] -> [JsvCell]
+    pushes = map (JsvCell . Formatted)
 
     ok :: () -> [JsvCell]
     ok _ = pure $ JsvCell @T.Text "ok"
@@ -102,4 +107,66 @@ instance ToJSON (Formatted (Device 'Existing)) where
     , "hasSms" .= (d^.deviceHasSms)
     , "manufacturer" .= (d^.deviceManufacturer)
     , "model" .= (d^.deviceModel)
+    ]
+
+instance ToJSON (Formatted (Push 'Existing)) where
+  toJSON (Formatted Push{..}) = object
+    [ "id" .= pushId
+    , "active" .= pushActive
+    , "created" .= pushCreated
+    , "modified" .= pushModified
+    , "dismissed" .= pushDismissed
+    , "direction" .= pushDirection
+    , "sender" .= case pushSender of
+      SentByUser {..} -> object
+        [ "type" .= id @String "user"
+        , "id" .= pushSenderUserId
+        , "clientId" .= pushSenderClientId
+        , "email" .= pushSenderUserEmail
+        , "emailNormalized" .= pushSenderUserEmailNormalized
+        , "name" .= pushSenderName
+        ]
+      SentByChannel {..} -> object
+        [ "type" .= id @String "channel"
+        , "id" .= pushSenderChannelId
+        , "name" .= pushSenderName
+        ]
+    , "receiver" .= pushReceiver <#> \case
+      ReceivedByUser {..} -> object
+        [ "type" .= id @String "user"
+        , "id" .= pushReceiverUserId
+        , "email" .= pushReceiverEmail
+        , "emailNormalized" .= pushReceiverEmailNormalized
+        ]
+    , "sourceDevice" .= pushSourceDevice
+    , "target" .= case pushTarget of
+      SentBroadcast -> object
+        [ "type" .= id @String "broadcast"
+        ]
+      SentToDevice d -> object
+        [ "type" .= id @String "sentToDevice"
+        , "id" .= d
+        ]
+    , "guid" .= pushGuid
+    , "data" .= case pushData of
+      NotePush {..} -> object
+        [ "title" .= pushTitle
+        , "body" .= pushBody
+        , "type" .= id @String "note"
+        ]
+      LinkPush {..} -> object
+        [ "title" .= pushTitle
+        , "body" .= pushLinkBody
+        , "link" .= pushUrl
+        , "type" .= id @String "link"
+        ]
+      FilePush {..} -> object
+        [ "title" .= pushTitle
+        , "body" .= pushFileBody
+        , "filetype" .= pushFileType
+        , "url" .= pushFileUrl
+        , "imageUrl" .= pushFileUrl
+        , "imageWidth" .= pushImageWidth
+        , "imageHeight" .= pushImageHeight
+        ]
     ]
