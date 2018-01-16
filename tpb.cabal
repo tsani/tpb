@@ -48,7 +48,6 @@ executable tpb
   main-is: Main.hs
   other-modules:
     Command,
-    Count,
     Format,
     Misc,
     Request,
