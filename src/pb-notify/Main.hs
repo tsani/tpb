@@ -172,9 +172,8 @@ main :: IO ()
 main = do
   token <- getEnv "PUSHBULLET_KEY"
   deviceIdS <- getEnv "PBNOTIFY_DEVICE"
-  listenPort <- do
-    p <- getEnv "PBNOTIFY_PORT"
-    maybe (die "PBNOTIFY_PORT must be an integer") pure $ readMaybe p
+  listenPort <- getEnv "PBNOTIFY_PORT" >>=
+    maybe (die "PBNOTIFY_PORT must be an integer") pure . readMaybe
 
   let key = PushbulletKey (T.pack token)
 
