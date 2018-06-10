@@ -5,6 +5,46 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators #-}
 
+-- | Welcome to pb-notify's implementation.
+-- The basic structure of this program is informed by how PushBullet a
+-- websocket client.
+-- Imagine a setup like the following, with clients Alice and Bob,
+-- communicating with PushBullet.
+-- 
+-- > Alice --> PB <-- Bob
+--
+-- Bob is connected to PushBullet over a websocket connection. We say
+-- Bob is "listening to the livestream".
+-- Alice creates a push notification via an HTTP API call.
+-- PushBullet will send a notification to all websocket subscribers,
+-- such as Bob. The event received by Bob, however, does not contain
+-- much information! Indeed, this is a so-called \"tickle\" event.
+-- In response to a tickle event, pb-notify needs to see if any new
+-- pushes have arrived, and transform any into system notifications.
+-- To do so, pb-notify stores the time of the most recent push, so
+-- that when asking PushBullet what new pushes there are, pb-notify
+-- can use the appropriate query string parameter to control what
+-- pushes get listed.
+--
+-- Furthermore, in order for PushBullet's universal clipboard feature
+-- to work, this application also exposes an HTTP server. By calling
+-- pb-notify's HTTP server, a program running on the same host as
+-- pb-notify can request to set the global PushBullet clipboard.
+-- Similarly, when universal clipboard change notifications are
+-- received via the websocket, the websocket client thread sets the
+-- internal variable that stores the current known state of the
+-- universal clipboard.
+-- 
+-- To make this setup work, this application is multithreaded.
+-- * The websocket client thread: This thread listens for websocket
+--   events, such as tickles, and sends an asynchronous request to the
+--   HTTP client thread to check for new pushes.
+--   (This is the 'checkPushes' function.
+-- * The HTTP client thread: This thread awaits requests from other
+--   threads to perform PushBullet HTTP API calls.
+-- * The HTTP server thread: This thread awaits requests from other
+--   applications to get or set the shared PushBullet clipboard.
+
 module Main where
 
 import Network.Pushbullet.Api
@@ -261,9 +301,7 @@ http notiVar httpChan mke key = do
 
   forever $ do
     -- block until a new request
-    r <- getHttpChan httpChan
-
-    case r of
+    getHttpChan httpChan >>= \case
       SendClip t -> runClient (createEphemeral auth (mke t)) *> pure ()
 
       CheckPushes -> do
