@@ -169,11 +169,12 @@ cliRequest tz
       fullDescInfo $ subparser (
         command "list" (
           fullDescInfo $
-            pure (\c -> do
+            pure (\c a -> do
               let c' = maybe All id c
-              pure $ inject <$> listPushes c'
+              pure $ inject <$> listPushes a c'
             )
             <*> optional (option (Limit <$> auto) (long "limit"))
+            <*> switch (long "active")
         )
       )
     )
@@ -215,9 +216,9 @@ httpCommand key = iterM phi where
       k . unSmsMessages
         =<< lift (getSmsMessages auth (d `MessagesIn` t))
 
-    ListPushes count k -> do
+    ListPushes b count k -> do
       let f = fmap (fmap unExistingPushes)
-      let getPushes' = f . lift . getPushes auth Nothing Nothing Nothing
+      let getPushes' = f . lift . getPushes auth Nothing (Just b) Nothing
       k =<< getPaginatedLimit' count getPushes'
 
     ListThreads d k ->
