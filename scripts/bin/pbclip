@@ -5,12 +5,14 @@ if test -z "$PBNOTIFY_PORT" ; then
     exit 1
 fi
 
-TEXT="$1"
-
-if test -z "$TEXT" ; then
+if [[ "$1" = "set" ]] ; then
+    TEXT="$(cat)"
+    curl --fail --silent --data "$TEXT" \
+         -H "Content-type: text/plain;charset=utf-8" \
+         http://localhost:$PBNOTIFY_PORT/clip
+elif [[ "$1" = "get" ]] ; then
     curl --fail --silent http://localhost:$PBNOTIFY_PORT/clip
 else
-    curl --fail --silent --data "$TEXT" \
-        -H "Content-type: text/plain;charset=utf-8" \
-        http://localhost:$PBNOTIFY_PORT/clip
+    echo "Unrecognized command '$1'." >&2
+    exit 1
 fi
