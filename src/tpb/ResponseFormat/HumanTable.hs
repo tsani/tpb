@@ -14,6 +14,7 @@ import Network.Pushbullet.Types
 
 import Data.Function ( on )
 import Data.List ( sortBy )
+import Data.Maybe ( catMaybes )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as N
 import Data.Ord ( comparing )
@@ -29,7 +30,7 @@ newtype HumanTable = HumanTable P.Doc
 
 formatHumanTable
   :: TimeZone -> Product
-    '[[SmsMessage], [SmsThread], (), [Device 'Existing], Device 'Existing, [Push 'Existing]]
+    '[[SmsMessage], [SmsThread'], (), [Device 'Existing], Device 'Existing, [Push 'Existing]]
     HumanTable
 formatHumanTable tz
   = smsMessage -| smsThreads -| ok -| devices -| device1 -| pushes -| Inexhaustive where
@@ -91,14 +92,15 @@ formatHumanTable tz
     tenMins :: NominalDiffTime
     tenMins = 60 * 10 -- ten minutes
 
-    smsThreads :: [SmsThread] -> HumanTable
+    smsThreads :: [SmsThread'] -> HumanTable
     smsThreads
       = (HumanTable . P.vsep) -- join all the lines
       . map phi -- convert the thread to a line of text
-      . chronologicalBy (^.threadLatest.smsTime)
-        -- order by latest message in thread
+      . chronologicalBy (^.threadLatest.smsTime) -- order by latest
+      . catMaybes -- remove threads with no latest message
+      . map checkLatestMessage
       where
-        phi :: SmsThread -> P.Doc
+        phi :: SmsThreadWithLatest -> P.Doc
         phi t =
           dirName (msg^.smsDirection) P.<+> rs P.</>
           "on" P.<+> P.text time P.<$>

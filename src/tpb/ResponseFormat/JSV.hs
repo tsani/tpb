@@ -16,7 +16,7 @@ import Misc
 
 import Network.Pushbullet.Types
 
-import Data.Aeson ( ToJSON(..), encode, (.=), object, Value(Number) )
+import Data.Aeson ( ToJSON(..), encode, (.=), object, Value(Number, Null) )
 import qualified Data.ByteString.Lazy as LBS
 import Data.Monoid ( (<>) )
 import Lens.Micro
@@ -37,7 +37,7 @@ instance ToJSON JsvCell where
 
 formatJsv
   :: Product
-    '[[SmsMessage], [SmsThread], (), [Device 'Existing], Device 'Existing, [Push 'Existing]]
+    '[[SmsMessage], [SmsThread'], (), [Device 'Existing], Device 'Existing, [Push 'Existing]]
     JSV
 formatJsv
   = JSV
@@ -49,8 +49,8 @@ formatJsv
     sms :: [SmsMessage] -> [JsvCell]
     sms = map (JsvCell . Formatted)
 
-    threads :: [SmsThread] -> [JsvCell]
-    threads = map (JsvCell . Formatted)
+    threads :: [SmsThread'] -> [JsvCell]
+    threads = map (JsvCell . Formatted . fmap (fmap Formatted))
 
     devices :: [Device 'Existing] -> [JsvCell]
     devices = map (JsvCell . Formatted)
@@ -86,11 +86,14 @@ instance ToJSON (Formatted SmsMessage) where
       )
     ]
 
-instance ToJSON (Formatted SmsThread) where
+instance ToJSON a => ToJSON (Formatted (Maybe a)) where
+  toJSON (Formatted m) = maybe Null toJSON m
+
+instance ToJSON a => ToJSON (Formatted (SmsThread a)) where
   toJSON (Formatted t) = object
     [ "id" .= (t^.threadId)
     , "recipients" .= (Formatted <$> t^.threadRecipients)
-    , "latest" .= Formatted (t^.threadLatest)
+    , "latest" .= (t^.threadLatest)
     ]
 
 instance ToJSON (Formatted SmsThreadRecipient) where

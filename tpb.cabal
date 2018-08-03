@@ -58,7 +58,7 @@ executable tpb
   ghc-options:
     -Wall
   build-depends:
-    pushbullet-types >=0.4,
+    pushbullet-types >=0.5,
     servant-pushbullet-client >=0.4,
 
     aeson >=1.0,

@@ -270,7 +270,7 @@ ePutStrLn = hPutStrLn stderr
 -- | Match a name to an sms thread. If there is no name given, always produces
 -- True. Otherwise, returns True if and only if there exists a recipient of the
 -- thread whose casefolded name contains the given name as a substring.
-fuzzyMatchThreadRecipientName :: FuzzyName -> SmsThread -> Bool
+fuzzyMatchThreadRecipientName :: FuzzyName -> SmsThread a -> Bool
 fuzzyMatchThreadRecipientName f t = any (fuzzyMatchName f) names where
   names = (t^.threadRecipients.to toList)^..each.recipientName
 
@@ -288,7 +288,7 @@ fuzz = FuzzyName . T.toCaseFold
 
 -- | Look up a thread by fuzzy-matching a recipient's name.
 fuzzyLookupThread
-  :: FuzzyName -> DeviceId -> Command (Maybe SmsThread)
+  :: FuzzyName -> DeviceId -> Command (Maybe (SmsThread'))
 fuzzyLookupThread f d = do
   threads <- listThreads d
   pure $ case filter (fuzzyMatchThreadRecipientName f) threads of
