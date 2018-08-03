@@ -1,5 +1,10 @@
 # Revision history for tpb
 
+## 0.5.0.0  -- 2018-08-03
+
+* Bump dependency on pushbullet-types to 0.5.
+  This version includes an adjusted type of `SmsMessage` which resolves issue 2.
+
 ## 0.4.0.0  -- 2017-08-01
 
 * Bump dependency on servant-pushbullet-client and pushbullet-types to 0.4.
