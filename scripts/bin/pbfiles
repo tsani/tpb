@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Lists all file push URLs
+# Limit output count by `--limit n` to check the last `n` pushes.
+
+tpb --jsv push list --active $@ | jq -r '.data.url' | grep -v '^null$'
