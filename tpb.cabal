@@ -54,7 +54,7 @@ executable tpb
     -Wall
   build-depends:
     pushbullet-types >=0.5,
-    servant-pushbullet-client >=0.4,
+    servant-pushbullet-client >=0.5,
 
     aeson >=1.0,
     ansi-wl-pprint >=0.6,
@@ -71,8 +71,8 @@ executable tpb
     optparse-applicative >=0.13,
     text >=1.2,
     time >=1.6,
-    servant >=0.9,
-    servant-client >=0.9
+    servant >=0.13,
+    servant-client >=0.13
 
 executable pb-notify
   hs-source-dirs: src/pb-notify
@@ -81,8 +81,8 @@ executable pb-notify
   ghc-options:
     -Wall
   build-depends:
-    pushbullet-types >=0.4,
-    servant-pushbullet-client >=0.4,
+    pushbullet-types >=0.5,
+    servant-pushbullet-client >=0.5,
 
     aeson >=1.0,
     async >=2.1,
@@ -92,8 +92,8 @@ executable pb-notify
     http-client >=0.5,
     http-client-tls >=0.3,
     libnotify >=0.2,
-    servant-client >=0.9,
-    servant-server >=0.9,
+    servant-client >=0.13,
+    servant-server >=0.13,
     text >=1.2,
     time >=1.6,
     websockets >=0.10,

@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -154,6 +155,8 @@ type PbNotifyApi =
     ReqBody '[PlainText] T.Text :> PostAccepted '[PlainText] NoContent
   )
 
+newtype f :~> g = Nat { runNat :: forall a. f a -> g a }
+
 pbNotifyApi :: Proxy PbNotifyApi
 pbNotifyApi = Proxy
 
@@ -217,9 +220,16 @@ main = do
 
   let key = PushbulletKey (T.pack token)
 
+  let auth = pushbulletAuth key
+
+  manager <- newManager tlsManagerSettings
+  let url = BaseUrl Https "api.pushbullet.com" 443 ""
+  let env = ClientEnv { manager, baseUrl = url, cookieJar = Nothing }
+  let runClient = Nat (retryingDelay timeoutDelay . flip runClientM env)
+
   -- strategy for making clipboard ephemerals
   makeClipEphemeral <- do
-    uid <- _userId <$> getUser key
+    uid <- _userId <$> runNat runClient (getMe auth)
     let did = DeviceId (T.pack deviceIdS)
 
     pure $ \x -> PushEphemeral (Just allEphemeralTargets) Clipboard
@@ -239,7 +249,7 @@ main = do
   -- transformed into notifications.
   -- HTTP requests sent by this thread are retried indefinitely until they
   -- succeed.
-  _ <- async (http notiVar httpChan makeClipEphemeral key)
+  _ <- async (http runClient notiVar httpChan makeClipEphemeral auth)
 
   -- run the http server thread
   -- This thread runs a dead simple API to access the pushbullet clipboard
@@ -265,50 +275,33 @@ main = do
     threadDelay timeoutDelay
     putStrLn "restarting websocket connection..."
 
-getUser :: PushbulletKey -> IO User
-getUser key = do
-  let auth = pushbulletAuth key
-
-  manager <- newManager tlsManagerSettings
-  let url = BaseUrl Https "api.pushbullet.com" 443 ""
-  let env = ClientEnv manager url
-  let runClient = {- debug -} retryingDelay timeoutDelay . flip runClientM env
-
-  runClient (getMe auth)
-
 http
-  :: NotifyMapVar
+  :: ClientM :~> IO
+  -> NotifyMapVar
   -> HttpChan
   -> (T.Text -> Ephemeral)
-  -> PushbulletKey
+  -> Auth
   -> IO ()
-http notiVar httpChan mke key = do
-  let auth = pushbulletAuth key
-
-  manager <- newManager tlsManagerSettings
-  let url = BaseUrl Https "api.pushbullet.com" 443 ""
-  let env = ClientEnv manager url
-  let runClient = {- debug -} retryingDelay timeoutDelay . flip runClientM env
-
+http runClient notiVar httpChan mke auth = do
   -- create a variable holding the last push time we've processed.
   -- Initially, we set it to contain the time of the most recent push, if one
   -- exists; else, we set it to UTC zero.
   lastPushTimeVar <- do
     -- get the most recent push, just for its timestamp
     (Page (ExistingPushes pushes) _) <-
-      runClient (getPushes auth Nothing (Just True) (Just 1) Nothing)
+      runNat runClient (getPushes auth Nothing (Just True) (Just 1) Nothing)
     newIORef (maybe minPushbulletTime pushModified (listToMaybe pushes))
 
   forever $ do
     -- block until a new request
     getHttpChan httpChan >>= \case
-      SendClip t -> runClient (createEphemeral auth (mke t)) *> pure ()
+      SendClip t -> runNat runClient (createEphemeral auth (mke t)) *> pure ()
 
       CheckPushes -> do
         lastPushTime <- readIORef lastPushTimeVar
         let f = fmap (fmap unExistingPushes)
         getPushes' <- pure $ \time active n ->
-          f . runClient . getPushes auth time active n
+          f . runNat runClient . getPushes auth time active n
         let getPushes'' = getPushes' (Just lastPushTime) (Just True) Nothing
         start <- getPushes'' Nothing
         let next = getPushes'' . Just

@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -190,7 +191,7 @@ run (Request format key cmd) = do
   manager <- newManager tlsManagerSettings
   let url = BaseUrl Https "api.pushbullet.com" 443 ""
   -- let url = BaseUrl Http "localhost" 8088 ""
-  let env = ClientEnv manager url
+  let env = ClientEnv { manager, baseUrl = url, cookieJar = Nothing }
 
   let comm = httpCommand key cmd'
   let runClient = flip runClientM env
