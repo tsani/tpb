@@ -317,7 +317,7 @@ http runClient notiVar httpChan mke auth = do
 
             m <- readIORef v
             let note = preparePushNotification pushData
-            let g = if pushActive then addNoti note else deleteNoti
+            let g = if pushActive && not pushDismissed then addNoti note else deleteNoti
             writeIORef v =<< g pid m
 
           (,) <$> readIORef v <*> pure ()
