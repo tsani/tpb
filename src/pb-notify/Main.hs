@@ -11,7 +11,7 @@
 -- websocket client.
 -- Imagine a setup like the following, with clients Alice and Bob,
 -- communicating with PushBullet.
--- 
+--
 -- > Alice --> PB <-- Bob
 --
 -- Bob is connected to PushBullet over a websocket connection. We say
@@ -35,7 +35,7 @@
 -- received via the websocket, the websocket client thread sets the
 -- internal variable that stores the current known state of the
 -- universal clipboard.
--- 
+--
 -- To make this setup work, this application is multithreaded.
 -- * The websocket client thread: This thread listens for websocket
 --   events, such as tickles, and sends an asynchronous request to the
@@ -65,16 +65,14 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.IORef
 import Data.List ( sortBy )
 import qualified Data.Map.Strict as M
-import Data.Maybe ( listToMaybe )
-import Data.Monoid ( (<>) )
+import Data.Maybe ( fromMaybe, listToMaybe )
 import Data.Ord ( comparing )
 import qualified Data.Text as T
 import Data.Time.Format ( defaultTimeLocale, formatTime )
 import Data.Time.LocalTime ( getTimeZone, utcToLocalTime )
-import qualified Libnotify as Noti
+import qualified GI.Notify as Noti
 import Network.HTTP.Client ( newManager )
 import Network.HTTP.Client.TLS ( tlsManagerSettings )
-import Network.Wai ( Application )
 import Network.Wai.Handler.Warp ( run )
 import qualified Network.WebSockets as WS
 import Servant
@@ -86,7 +84,7 @@ import System.Timeout ( timeout )
 import Text.Read ( readMaybe )
 import Wuss ( runSecureClient )
 
-appName :: String
+appName :: T.Text
 appName = "pb-notify"
 
 timeoutDelay :: Int
@@ -161,20 +159,20 @@ pbNotifyApi :: Proxy PbNotifyApi
 pbNotifyApi = Proxy
 
 addNoti
-  :: Noti.Mod Noti.Notification
+  :: Noti.Notification
   -> T.Text
   -> NotifyMap
   -> IO NotifyMap
 addNoti n t (NotifyMap m)= do
-  noti <- Noti.display n
-  pure $ NotifyMap (M.insert t noti m)
+  Noti.notificationShow n
+  pure $ NotifyMap (M.insert t n m)
 
 deleteNoti :: T.Text -> NotifyMap -> IO NotifyMap
 deleteNoti t (NotifyMap m) = do
   case M.lookup t m of
     Nothing -> pure (NotifyMap m)
     Just n -> do
-      Noti.close n
+      Noti.notificationClose n
       pure $ NotifyMap (M.delete t m)
 
 webapp :: ClipDataVar -> HttpChan -> Application
@@ -213,6 +211,7 @@ die s = hPutStrLn stderr s *> exitFailure
 
 main :: IO ()
 main = do
+  True <- Noti.init appName
   token <- getEnv "PUSHBULLET_KEY"
   deviceIdS <- getEnv "PBNOTIFY_DEVICE"
   listenPort <- getEnv "PBNOTIFY_PORT" >>=
@@ -316,30 +315,26 @@ http runClient notiVar httpChan mke auth = do
             writeIORef lastPushTimeVar pushModified
 
             m <- readIORef v
-            let note = preparePushNotification pushData
+            note <- preparePushNotification pushData
             let g = if pushActive && not pushDismissed then addNoti note else deleteNoti
             writeIORef v =<< g pid m
 
           (,) <$> readIORef v <*> pure ()
 
-preparePushNotification :: PushData 'Existing -> Noti.Mod Noti.Notification
-preparePushNotification pushData = mconcat $ case pushData of
+preparePushNotification :: PushData 'Existing -> IO Noti.Notification
+preparePushNotification pushData = case pushData of
   NotePush{..} ->
-    [ Noti.summary ("Note: " ++ maybe "[untitled]" T.unpack pushTitle)
-    , Noti.body (T.unpack pushBody)
-    , Noti.appName appName
-    ]
+    prep
+      ("Note: " <> fromMaybe "[untitled]" pushTitle)
+      pushBody
   LinkPush{..} ->
-    [ Noti.summary ("Link: " ++ maybe "[untitled]" T.unpack pushTitle)
-    , Noti.body $ T.unpack $ formatLinkPush pushUrl pushLinkBody
-    , Noti.appName appName
-    ]
+    prep
+      ("Link: " <> fromMaybe "[untitled]" pushTitle)
+      (formatLinkPush pushUrl pushLinkBody)
   FilePush{..} ->
-    [ Noti.summary ("File: " ++ T.unpack pushFileName)
-    , Noti.body (T.unpack (unUrl pushFileUrl))
-    , Noti.appName appName
-    ]
+    prep ("File: " <> pushFileName) (unUrl pushFileUrl)
   where
+    prep summary body = Noti.notificationNew summary (Just body) Nothing
     formatLinkPush (Url url) mbody = case mbody of
       Nothing -> url
       Just body -> body <> "\n" <> url
@@ -372,11 +367,12 @@ handle httpChan (ClipDataVar lock clip) raw = do
         SmsChanged{..} ->
           forM_ _ephNotifications $ \Notification{..} -> do
             t <- niceTime _notifTime
-            Noti.display_ $ mconcat
-              [ Noti.summary (T.unpack $ "SMS from " <> _notifTitle)
-              , Noti.body (T.unpack (_notifBody <> "\n") <> t)
-              , Noti.appName appName
-              ]
+            n <- Noti.notificationNew
+              ("SMS from " <> _notifTitle)
+              (Just $ (_notifBody <> "\n" <> t))
+              Nothing
+            Noti.notificationShow n
+
         Clipboard{..} ->
           modifyMVar_ lock $ const $ do
             writeIORef clip _ephClipBody
@@ -385,9 +381,9 @@ handle httpChan (ClipDataVar lock clip) raw = do
       _ -> pure ()
     Left _ -> pure ()
 
-niceTime :: PushbulletTime -> IO String
+niceTime :: PushbulletTime -> IO T.Text
 niceTime (PushbulletTime t) =
-  formatTime defaultTimeLocale "%a %d %b %Y @ %H:%M:%S"
+  T.pack . formatTime defaultTimeLocale "%a %d %b %Y @ %H:%M:%S"
     <$> (utcToLocalTime <$> getTimeZone t <*> pure t)
 
 -- | Retries an IO action that can fail with Either indefinitely.

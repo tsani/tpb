@@ -1,0 +1,9 @@
+resolver: lts-16.5
+packages:
+  - .
+  - ../pushbullet-hs/pushbullet-types
+  - ../pushbullet-hs/servant-pushbullet-client
+extra-deps:
+  - gi-notify-0.7.21
+  - haskell-gi-0.23.1
+  - haskell-gi-base-0.23.0
