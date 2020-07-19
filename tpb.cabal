@@ -74,6 +74,27 @@ executable tpb
     servant >=0.13,
     servant-client >=0.13
 
+executable pbd
+  hs-source-dirs: src/pbd
+  default-language: Haskell2010
+  main-is: Main.hs
+  ghc-options: -Wall
+  build-depends:
+    pushbullet-types >=0.5,
+    servant-pushbullet-client >=0.5,
+
+    aeson >=1.0,
+    async >=2.1,
+    base >=4.9,
+    bytestring >=0.10,
+    http-client >=0.5,
+    http-client-tls >=0.3,
+    mtl >=2.2,
+    servant-client >=0.13,
+    text >=1.2,
+    websockets >=0.10,
+    wuss >=1.1
+
 executable pb-notify
   hs-source-dirs: src/pb-notify
   default-language: Haskell2010
