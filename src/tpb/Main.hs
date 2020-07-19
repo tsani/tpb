@@ -261,7 +261,7 @@ type Request'
   = Request IO PushbulletKey
 
 data Error
-  = ServantError ServantError
+  = ServantError ClientError
   | CommandError T.Text
   deriving (Eq, Show)
 
